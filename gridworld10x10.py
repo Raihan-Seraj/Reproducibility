@@ -7,6 +7,10 @@ RIGHT = 1
 DOWN = 2
 LEFT = 3
 
+def decodeState(num):
+    x=num%10
+    y=num//10
+    return np.array([x,y])*1.0
 class GridworldEnv(discrete.DiscreteEnv):
     """
     Grid World environment from Sutton's Reinforcement Learning book chapter 4.
@@ -20,6 +24,7 @@ class GridworldEnv(discrete.DiscreteEnv):
     """
 
     metadata = {'render.modes': ['human', 'ansi']}
+
 
     def __init__(self, shape=[10,10]):
         if not isinstance(shape, (list, tuple)) or not len(shape) == 2:
@@ -45,7 +50,7 @@ class GridworldEnv(discrete.DiscreteEnv):
             P[s] = {a : [] for a in range(nA)}
             #we set the terminal state as (0,4) aka state number 31
             is_done = lambda s: s == 31
-            reward =1.0 if is_done(s) else 0.0
+            reward = 0.0 if is_done(s) else -1.0
 
             # We're stuck in a terminal state
             if is_done(s):
