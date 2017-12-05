@@ -3,7 +3,7 @@ import itertools
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-
+import pdb
 import baselines.common.tf_util as U
 
 from baselines import logger
@@ -18,7 +18,7 @@ def model(inpt, num_actions, scope, reuse=False):
     with tf.variable_scope(scope, reuse=reuse):
         
         out = inpt
-        out = layers.fully_connected(out, num_outputs=64, activation_fn=tf.nn.tanh)
+        out = layers.fully_connected(out, num_outputs=32, activation_fn=tf.nn.tanh)
         out = layers.fully_connected(out, num_outputs=num_actions, activation_fn=None)
         return out
 
@@ -28,8 +28,8 @@ if __name__ == '__main__':
         # Create the environment
         env = gd.GridworldEnv()
         # Create all the functions necessary to train the model
-        act, train, update_target, debug = deepq.build_train(
-            make_obs_ph=lambda name: U.BatchInput(env.observation_space.shape, name=name),
+        act, train, update_target, debug1 = deepq.build_train(
+            make_obs_ph=lambda name: U.BatchInput(np.array([1,1]).shape, name=name),
             q_func=model,
             num_actions=env.action_space.n,
             optimizer=tf.train.RMSPropOptimizer(learning_rate=10e-4),
@@ -48,17 +48,22 @@ if __name__ == '__main__':
 
             episode_rewards = [0.0]
             obs = env.reset()
+            obs=gd.decodeState(obs)
             for t in itertools.count():
                 # Take action and update exploration to the newest value
+                #pdb.set_trace()
                 action = act(obs[None], update_eps=exploration.value(t))[0]
                 new_obs, rew, done, _ = env.step(action)
+                temp_obs=obs
+                new_obs=gd.decodeState(new_obs)
                 # Store transition in the replay buffer.
                 replay_buffer.add(obs, action, rew, new_obs, float(done))
                 obs = new_obs
-
+                
                 episode_rewards[-1] += rew
                 if done:
                     obs = env.reset()
+                    obs=gd.decodeState(obs)
                     episode_rewards.append(0)
 
                 is_solved = len(episode_rewards)==2000#t > 100 and np.mean(episode_rewards[-101:-1]) >= 200 and len(episode_rewards)>=100
@@ -81,7 +86,9 @@ if __name__ == '__main__':
                     logger.record_tabular("mean episode reward", round(np.mean(episode_rewards[-101:-1]), 1))
                     logger.record_tabular("% time spent exploring", int(100 * exploration.value(t)))
                     logger.record_tabular("Number of runs",avg)
+                    logger.record_tabular("Qvalue",np.max(debug1['q_values'](temp_obs[None])))
                     logger.dump_tabular()
+                #pdb.set_trace()
             average_rewards.append(episode_rewards)
         episode_rewards_mean=np.mean(np.array(average_rewards),axis=0)
         episode_rewards_var=np.var(np.array(average_rewards),axis=0)
