@@ -18,14 +18,13 @@ from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
+from numpy import linalg as LA
 # all states: state 0-5 are upper states
 STATES = np.arange(0, 6)
 # state 6 is lower state
 LOWER_STATE = 5
 # discount factor
 DISCOUNT = 0.99
-
 # each state is represented by a vector of length 6
 FEATURE_SIZE = 7
 FEATURES = np.zeros((len(STATES), FEATURE_SIZE))
@@ -85,14 +84,11 @@ def qlearning(state,theta,alpha):
     action = behaviorPolicy(state)
     nextState = takeAction(state,action)
 
-    # delta=REWARD+DISCOUNT*np.dot(FEATURES[nextState, :], theta) -\
-    # np.dot(FEATURES[state,:],theta)
-    # theta +=alpha*delta*FEATURES[state,:]
-    # if action == RED:
-    #     rho = 0.0
-    # else:
-    #     rho = 1.0 / BEHAVIOR_BLACK_PROBABILITY
-    rho=1
+    if action == RED:
+        rho = 0.0
+    else:
+        rho = 1.0 / BEHAVIOR_BLACK_PROBABILITY
+    # rho=1
     delta = REWARD + DISCOUNT * np.dot(FEATURES[nextState, :], theta) - \
             np.dot(FEATURES[state, :], theta)
     delta *= rho * alpha
@@ -123,6 +119,8 @@ def qlearning_plot():
             values[step]=np.dot(FEATURES[state,:],theta)
         temp+=values
     avg_val=temp/10.0
+    GLOBAL_TD_VAL=avg_val
+    global GLOBAL_TD_VAL
     global figureIndex
     plt.figure(figureIndex)
     figureIndex += 1
@@ -131,10 +129,80 @@ def qlearning_plot():
     plt.plot(avg_val,label="values of state")
     plt.xlabel('Steps')
     plt.ylabel('average values of states ')
-    plt.title('Q learning')
+    plt.title('TD learning')
     plt.legend()
+def constraintQ(state,theta,alpha):
+    action = behaviorPolicy(state)
+    nextState = takeAction(state,action)
+    action_next=behaviorPolicy(nextState)
+    nextState_next=takeAction(nextState,action_next)
+    delta=REWARD+DISCOUNT*np.dot(FEATURES[nextState, :], theta) -\
+    np.dot(FEATURES[state,:],theta)
+    theta +=alpha*delta*FEATURES[state,:]
+    if action == RED:
+        rho = 0.0
+    else:
+        rho = 1.0 / BEHAVIOR_BLACK_PROBABILITY
+    if action_next==RED:
+        rho_next=0.0
+    else:
+        rho_next=1.0 / BEHAVIOR_BLACK_PROBABILITY
 
+    # rho=1
+    # rho_next=1
+    # #gradient_TD
 
+    delta = REWARD + DISCOUNT * np.dot(FEATURES[nextState, :], theta) - \
+            np.dot(FEATURES[state, :], theta)
+    delta *= FEATURES[state, :] *rho
+
+    delta_next=REWARD+DISCOUNT *np.dot(FEATURES[nextState_next,:],theta) - \
+        np.dot(FEATURES[nextState, :],theta)
+    if(rho_next!=0):
+        delta_next*=FEATURES[nextState, :]
+        delta_next/=LA.norm(delta_next)
+    else:
+        delta_next=0.0
+    delta-=np.dot(delta,delta_next)*delta_next
+    # derivatives happen to be the same matrix due to the linearity
+    theta +=  delta* alpha
+
+    return nextState
+""" the ploting """
+def c_qlearning_plot():
+    # Initialize the theta
+
+    temp=np.zeros(2000)
+    for _ in range(10):
+        theta = np.ones(FEATURE_SIZE)
+        theta[6] = 10
+
+        alpha = 0.01
+
+        steps = 2000
+        thetas = np.zeros((FEATURE_SIZE, steps))
+        state = np.random.choice(STATES)
+        states=np.zeros(2000)
+        values=np.zeros(2000)
+        for step in range(steps):
+            state = constraintQ(state, theta, alpha)
+            thetas[:, step] = theta
+            states[step]=state
+            values[step]=np.dot(FEATURES[state,:],theta)
+        temp+=values
+    avg_val=temp/10.0
+    global figureIndex
+    plt.figure(figureIndex)
+    figureIndex += 1
+    # for i in range(FEATURE_SIZE):
+    #     plt.plot(thetas[i, :], label='theta' + str(i + 1))
+    plt.plot(avg_val,label="constrained TD")
+    # print(GLOBAL_TD_VAL)
+    # plt.plot(GLOBAL_TD_VAL,label="TD")
+    plt.xlabel('Steps')
+    plt.ylabel('average values of states ')
+    plt.title('constrained TD learning ')
+    plt.legend()
 
 # Semi-gradient off-policy temporal difference
 # @state: current state
@@ -413,4 +481,5 @@ if __name__ == '__main__':
     # figure11_6_b()
     # figure11_7()
     qlearning_plot()
+    c_qlearning_plot()
     plt.show()
